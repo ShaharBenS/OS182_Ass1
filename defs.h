@@ -120,6 +120,11 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+
+
+int setVariable(char* variable, char* value);
+int getVariable(char* variable, char* value);
+int remVariable(char* variable);
 int             wait2(int pid,int * wtime, int * rtime,int * iotime);
 
 // swtch.S

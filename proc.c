@@ -89,24 +89,7 @@ void updateProcessesTime()
     }
     release(&ptable.lock);
 }
-int wait2(int pid,int* wtime,int *rtime,int *iotime)
-{
-    struct proc *p;
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    {
-        if(p->pid == pid)
-        {
-            *wtime  = p->etime-p->ctime-p->iotime-p->rtime;
-            *rtime  = p->rtime;
-            *iotime = p->iotime;
-            release(&ptable.lock);
-            return 0;
-        }
-    }
-    release(&ptable.lock);
-    return -1;
-}
+
 
 
 
@@ -573,4 +556,119 @@ procdump(void) {
         }
         cprintf("\n");
     }
+}
+
+
+
+
+
+
+
+#define MAX_VARIABLES 32
+#define MAX_VAR_LENGTH 128
+#define EMPTY "0"
+
+char variables[MAX_VARIABLES][MAX_VARIABLES];
+char values[MAX_VAR_LENGTH][MAX_VAR_LENGTH];
+
+int need_to_init = 1;
+
+int
+setVariable(char *variable, char *value)
+{
+    if(need_to_init == 1)
+    {
+        need_to_init = 0;
+        for(int i=0; i<MAX_VARIABLES; i++)
+        {
+            strncpy(variables[i],EMPTY,strlen(EMPTY));
+            strncpy(values[i],EMPTY,strlen(EMPTY));
+        }
+    }
+
+    //check illegal input
+    for(int i=0; i<MAX_VARIABLES; i++)
+    {
+        if(variable[i] == '\0') break;
+        if(!((variable[i]>= 'a' && variable[i] <= 'z') || (variable[i]>='A' && variable[i]<= 'Z')))
+            return -2;
+    }
+
+    char temp_val[MAX_VAR_LENGTH];
+    if(getVariable(variable,temp_val) == 0) //need to update
+        for(int i=0; i<MAX_VARIABLES; i++)
+        {
+            if(strncmp(variables[i], variable, (uint) strlen(variable)) == 0)
+            {
+                strncpy(values[i], value, strlen(value)+1);
+                break;
+            }
+        }
+    else {
+        for(int i=0; i<MAX_VARIABLES; i++)
+        {
+            if(strncmp(variables[i], EMPTY, (uint) strlen(EMPTY)) == 0)
+            {
+                strncpy(variables[i], variable, strlen(variable)+1);
+                strncpy(values[i], value, strlen(value)+1);
+                break;
+            }
+            if(i == MAX_VARIABLES -1) //no place for another var
+                return -1;
+        }
+    }
+
+    return 0;
+}
+
+int
+getVariable(char* variable, char* value)
+{
+    for(int i=0; i<MAX_VARIABLES; i++)
+    {
+        if(strncmp(variables[i], variable, (uint) strlen(variable)) == 0)
+        {
+            strncpy(value, values[i], strlen(values[i])+1);
+            break;
+        }
+        if( i== MAX_VARIABLES-1) //no var with [variable] name
+            return -1;
+    }
+    return 0;
+}
+
+int
+remVariable(char* variable)
+{
+    for(int i=0; i<MAX_VARIABLES; i++)
+    {
+        if(strncmp(variables[i], variable, (uint) strlen(variable)) == 0)
+        {
+            strncpy(variables[i],EMPTY,strlen(EMPTY));
+            strncpy(values[i],EMPTY,strlen(EMPTY));
+            break;
+        }
+        if( i== MAX_VARIABLES-1) //no var with [variable] name
+            return -1;
+    }
+    return 0;
+}
+
+int wait2(int pid,int* wtime,int *rtime,int *iotime)
+{
+    struct proc *p;
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+        if(p->pid == pid)
+        {
+            *wtime  = p->etime-p->ctime-p->iotime-p->rtime;
+            *rtime  = p->rtime;
+            *iotime = p->iotime;
+            release(&ptable.lock);
+            return 0;
+        }
+    }
+    release(&ptable.lock);
+    return -1;
 }

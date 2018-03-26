@@ -97,6 +97,36 @@ sys_uptime(void)
   return xticks;
 }
 
+
+
+
+
+
+
+int sys_setVariable(void) {
+  int var;
+  int val;
+
+  if (argint(0, &var) < 0 || argint(1, &val) <0) return -1;
+  return setVariable((char *) var, (char *) val);
+}
+
+int sys_getVariable(void) {
+  int var;
+  int val;
+
+
+  if (argint(0, &var) < 0 || argint(1, &val) < 0) return -1;
+  return getVariable((char *) var, (char *) val);
+}
+
+int sys_remVariable(void) {
+  int val;
+
+  if (argint(0, &val) < 0) return -1;
+  return remVariable((char *) val);
+}
+
 int sys_wait2(void)
 {
     int pid;

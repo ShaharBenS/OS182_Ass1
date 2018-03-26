@@ -195,6 +195,104 @@ PERSONAL_BUFFER:
         }
 
 
+        //global variables
+        //parse $
+        for (int i = 0; i < 100; i++) {
+            if (buf[i] == '$') {
+
+                int i_var = i + 1;
+                char temp[100]; //var name
+                char value[100]; //value of var
+                int i_temp = 0; //index for var
+                //copy the var name to temp
+                while (buf[i_var] != ' ' && buf[i_var] != '\0' && buf[i_var] != '\n') {
+                    temp[i_temp] = buf[i_var];
+                    i_temp++;
+                    i_var++;
+                }
+                temp[i_temp] = '\0'; //null terminated
+                if (getVariable(temp, value) == -1) {
+                    printf(2, "variable %s does not exist\n", temp);
+                    continue;
+                }
+                //replace the var with value.
+                //i_var + 1 = var len + $
+
+                int offset = strlen(value) - (i_var+1);
+                i += offset;
+                int flag_switch = 0;
+                //re-use of temp
+                i_temp = 0;
+                for (int j = 0; j < 100; j++) {
+                    if (buf[j] == '$' && flag_switch == 0) {
+                        flag_switch = 1;
+                        int i_value = 0;
+                        j += i_var-1;
+                        while (value[i_value] != '\0' && value[i_value] != '\n') {
+                            temp[i_temp] = value[i_value];
+                            i_temp++;
+                            i_value++;
+                        }
+                        continue;
+                    }
+                    temp[i_temp] = buf[j];
+                    i_temp++;
+                }
+                for (int j = 0; j < 100; j++) {
+                    buf[j] = temp[j];
+                }
+                printf(2, "=>>> %s\n",buf);
+
+            }
+        }
+
+        //parse =
+        int flag_usedGlobal = 0;
+
+        for (int i = 0; i < 100; i++) {
+
+            if (buf[i] == '=') {
+                flag_usedGlobal = 1;
+                int original = i;
+                i++;
+                int i_after = 0;
+                int i_before = 0;
+
+                char before[100];
+                char after[100];
+
+                while (buf[i] == ' ') i++;
+                while (buf[i] != ' ' && buf[i] != '\0' && buf[i] != '\n') {
+                    after[i_after] = buf[i];
+                    i_after++;
+                    i++;
+                }
+                i = original - 1;
+                while (buf[i] == ' ') {
+                    i--;
+                }
+                while (i >= 0 && buf[i] != ' ') {
+                    i--;
+                }
+                i++;
+                while (buf[i] != ' ' && buf[i] != '=') {
+                    before[i_before] = buf[i];
+                    i_before++;
+                    i++;
+
+                }
+                before[i_before] = '\0';
+                int result = setVariable(before, after);
+                if (result == -2) printf(2, "invalid variable name\n");
+                if (result == -1) printf(2, "no room for additional variables\n");
+
+                break;
+            }
+        }
+        if(flag_usedGlobal == 1) continue;
+
+
+
         if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' ') {
             // Chdir must be called by the parent, not the child.
             buf[strlen(buf) - 1] = 0;  // chop \n
