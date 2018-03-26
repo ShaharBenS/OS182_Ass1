@@ -97,7 +97,15 @@ sys_uptime(void)
   return xticks;
 }
 
-int sys_wait2(int pid,int *wtime,int *rtime,int *iotime)
+int sys_wait2(void)
 {
-    return wait2(pid,wtime,rtime,iotime);
+    int pid;
+    int wtime;
+    int rtime;
+    int iotime;
+    if(argint(0,&pid) < 0 || argint(1,&wtime) < 0 || argint(2,&rtime) < 0 || argint(3,&iotime))
+    {
+        return wait2(*((int*)pid), (int *) wtime, (int *) rtime, (int *) iotime);
+    }
+    return -1;
 }

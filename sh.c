@@ -160,6 +160,8 @@ int indexAfterSpace(const char *buf, int i);
 int
 main(void)
 {
+    /* Q_1.1 */
+    int flag = 0;
     static char buf[100];
     int fd;
     // Ensure that three file descriptors are open.
@@ -172,18 +174,25 @@ main(void)
 
     // Read and run input commands.
     while(getcmd(buf, sizeof(buf)) >= 0){
+        /* Q_1.1 */
 PERSONAL_BUFFER:
         //insert to history array
-        printf(2,"%s",buf);
-        if(iHistory == MAX_HISTORY)
+
+        if(!flag)
         {
-            for(int i=0; i<MAX_HISTORY; i++)
+            if(iHistory == MAX_HISTORY)
             {
-                strcpy(historyArray[i],historyArray[i+1]);
+                for(int i=0; i<MAX_HISTORY; i++)
+                    strcpy(historyArray[i],historyArray[i+1]);
+
+                iHistory--;
             }
-            iHistory--;
+            strcpy(historyArray[iHistory++], buf);
         }
-        strcpy(historyArray[iHistory++], buf);
+        else
+        {
+            flag = 0;
+        }
 
 
         if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' ') {
@@ -213,11 +222,14 @@ PERSONAL_BUFFER:
                 i = indexAfterSpace(buf, i);
             else continue;
             int index = (buf[i++]-48);
-            if(buf[i]!='\n')
+            if(buf[i]!='\n' && buf[i] != ' ')
                 index = index*10 + (buf[i++]-48);
-            if(index<1 || index>16 || buf[i]!='\n')
+            if(index<1 || index>16)
                 continue;
+
+
             strcpy(buf,historyArray[index-1]);
+            flag = 1;
             goto PERSONAL_BUFFER;
 
 
@@ -230,6 +242,7 @@ PERSONAL_BUFFER:
     exit();
 }
 
+/* Q_1.1 */
 int indexAfterSpace(const char *buf, int i) {
     while(buf[i] == ' ') i++;
     return i;

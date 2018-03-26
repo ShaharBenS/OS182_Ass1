@@ -63,7 +63,6 @@ struct proc
  * Q_2
  */
 void updateProcessesTime();
-int wait2(int pid,int* wtime,int *rtime,int *iotime);
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
