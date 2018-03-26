@@ -96,3 +96,8 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int sys_wait2(int pid,int *wtime,int *rtime,int *iotime)
+{
+    return wait2(pid,wtime,rtime,iotime);
+}
