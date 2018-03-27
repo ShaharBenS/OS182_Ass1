@@ -23,7 +23,6 @@ extern void trapret(void);
 static void wakeup1(void *chan);
 
 
-
 void
 pinit(void) {
     initlock(&ptable.lock, "ptable");
@@ -68,31 +67,23 @@ myproc(void) {
 }
 
 
-
 /*
  * Q_2
  */
-void updateProcessesTime()
-{
+void updateProcessesTime() {
     struct proc *p;
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    {
-        if(p->state == RUNNING)
-        {
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state == RUNNING) {
             p->rtime++;
-        }
-        if(p->state == SLEEPING)
-        {
+        } else if (p->state == SLEEPING) {
             p->iotime++;
+        } else if (p->state == RUNNABLE) {
+            p->index++;
         }
     }
     release(&ptable.lock);
 }
-
-
-
-
 
 
 //PAGEBREAK: 32
@@ -118,11 +109,15 @@ allocproc(void) {
     p->pid = nextpid++;
 
     /*  Q_2
-        * Initializing
+        Initializing
      */
+
     p->iotime = 0;
     p->rtime = 0;
     p->ctime = ticks;
+    /* Q_3 */
+    p->index = 0;
+    p->Approx = QUANTUM;
 
     release(&ptable.lock);
 
@@ -360,10 +355,12 @@ scheduler(void) {
     c->proc = 0;
 
     for (;;) {
+
         // Enable interrupts on this processor.
         sti();
 
         // Loop over process table looking for process to run.
+#ifdef DEFAULT
         acquire(&ptable.lock);
         for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
             if (p->state != RUNNABLE)
@@ -384,6 +381,84 @@ scheduler(void) {
             c->proc = 0;
         }
         release(&ptable.lock);
+#endif
+
+#ifdef FCFS
+        int max = -1;
+        struct proc * max_proc = 0;
+        acquire(&ptable.lock);
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if(p->state == RUNNABLE && p->index > max)
+            {
+                max = p->index;
+                max_proc = p;
+            }
+        }
+
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        if(max_proc != 0)
+        {
+            c->proc = max_proc;
+            switchuvm(max_proc);
+            max_proc->state = RUNNING;
+
+            swtch(&(c->scheduler), max_proc->context);
+            switchkvm();
+
+            // Process is done running for now.
+            // It should have changed its p->state before coming back.
+            c->proc = 0;
+        }
+
+
+        release(&ptable.lock);
+#endif
+
+#ifdef SRT
+        float min = 0;
+        struct proc * min_proc = 0;
+        acquire(&ptable.lock);
+        //find first RUNNABLE
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+            if(p->state == RUNNABLE)
+            {
+                min = p->Approx;
+                min_proc = p;
+                break;
+            }
+
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+            if(p->state == RUNNABLE && p->Approx < min)
+            {
+                min = p->Approx;
+                min_proc = p;
+            }
+
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        if(min_proc != 0)
+        {
+            c->proc = min_proc;
+            switchuvm(min_proc);
+            min_proc->state = RUNNING;
+
+            swtch(&(c->scheduler), min_proc->context);
+            switchkvm();
+
+            // Process is done running for now.
+            // It should have changed its p->state before coming back.
+            c->proc = 0;
+        }
+
+
+        release(&ptable.lock);
+
+#endif
+
+
 
     }
 }
@@ -418,6 +493,7 @@ void
 yield(void) {
     acquire(&ptable.lock);  //DOC: yieldlock
     myproc()->state = RUNNABLE;
+    myproc()->index = 0;
     sched();
     release(&ptable.lock);
 }
@@ -467,6 +543,9 @@ sleep(void *chan, struct spinlock *lk) {
     // Go to sleep.
     p->chan = chan;
     p->state = SLEEPING;
+    if(p->rtime >= p->Approx)
+        p->Approx = (p->Approx + ALPHA *p->Approx);
+
 
     sched();
 
@@ -488,8 +567,10 @@ wakeup1(void *chan) {
     struct proc *p;
 
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-        if (p->state == SLEEPING && p->chan == chan)
+        if (p->state == SLEEPING && p->chan == chan) {
+            p->index = 0;
             p->state = RUNNABLE;
+        }
 }
 
 // Wake up all processes sleeping on chan.
@@ -512,8 +593,10 @@ kill(int pid) {
         if (p->pid == pid) {
             p->killed = 1;
             // Wake process from sleep if necessary.
-            if (p->state == SLEEPING)
+            if (p->state == SLEEPING) {
+                p->index = 0;
                 p->state = RUNNABLE;
+            }
             release(&ptable.lock);
             return 0;
         }
@@ -559,11 +642,6 @@ procdump(void) {
 }
 
 
-
-
-
-
-
 #define MAX_VARIABLES 32
 #define MAX_VAR_LENGTH 128
 #define EMPTY "0"
@@ -574,46 +652,38 @@ char values[MAX_VAR_LENGTH][MAX_VAR_LENGTH];
 int need_to_init = 1;
 
 int
-setVariable(char *variable, char *value)
-{
-    if(need_to_init == 1)
-    {
+setVariable(char *variable, char *value) {
+    if (need_to_init == 1) {
         need_to_init = 0;
-        for(int i=0; i<MAX_VARIABLES; i++)
-        {
-            strncpy(variables[i],EMPTY,strlen(EMPTY));
-            strncpy(values[i],EMPTY,strlen(EMPTY));
+        for (int i = 0; i < MAX_VARIABLES; i++) {
+            strncpy(variables[i], EMPTY, strlen(EMPTY));
+            strncpy(values[i], EMPTY, strlen(EMPTY));
         }
     }
 
     //check illegal input
-    for(int i=0; i<MAX_VARIABLES; i++)
-    {
-        if(variable[i] == '\0') break;
-        if(!((variable[i]>= 'a' && variable[i] <= 'z') || (variable[i]>='A' && variable[i]<= 'Z')))
+    for (int i = 0; i < MAX_VARIABLES; i++) {
+        if (variable[i] == '\0') break;
+        if (!((variable[i] >= 'a' && variable[i] <= 'z') || (variable[i] >= 'A' && variable[i] <= 'Z')))
             return -2;
     }
 
     char temp_val[MAX_VAR_LENGTH];
-    if(getVariable(variable,temp_val) == 0) //need to update
-        for(int i=0; i<MAX_VARIABLES; i++)
-        {
-            if(strncmp(variables[i], variable, (uint) strlen(variable)) == 0)
-            {
-                strncpy(values[i], value, strlen(value)+1);
+    if (getVariable(variable, temp_val) == 0) //need to update
+        for (int i = 0; i < MAX_VARIABLES; i++) {
+            if (strncmp(variables[i], variable, (uint) strlen(variable)) == 0) {
+                strncpy(values[i], value, strlen(value) + 1);
                 break;
             }
         }
     else {
-        for(int i=0; i<MAX_VARIABLES; i++)
-        {
-            if(strncmp(variables[i], EMPTY, (uint) strlen(EMPTY)) == 0)
-            {
-                strncpy(variables[i], variable, strlen(variable)+1);
-                strncpy(values[i], value, strlen(value)+1);
+        for (int i = 0; i < MAX_VARIABLES; i++) {
+            if (strncmp(variables[i], EMPTY, (uint) strlen(EMPTY)) == 0) {
+                strncpy(variables[i], variable, strlen(variable) + 1);
+                strncpy(values[i], value, strlen(value) + 1);
                 break;
             }
-            if(i == MAX_VARIABLES -1) //no place for another var
+            if (i == MAX_VARIABLES - 1) //no place for another var
                 return -1;
         }
     }
@@ -622,48 +692,39 @@ setVariable(char *variable, char *value)
 }
 
 int
-getVariable(char* variable, char* value)
-{
-    for(int i=0; i<MAX_VARIABLES; i++)
-    {
-        if(strncmp(variables[i], variable, (uint) strlen(variable)) == 0)
-        {
-            strncpy(value, values[i], strlen(values[i])+1);
+getVariable(char *variable, char *value) {
+    for (int i = 0; i < MAX_VARIABLES; i++) {
+        if (strncmp(variables[i], variable, (uint) strlen(variable)) == 0) {
+            strncpy(value, values[i], strlen(values[i]) + 1);
             break;
         }
-        if( i== MAX_VARIABLES-1) //no var with [variable] name
+        if (i == MAX_VARIABLES - 1) //no var with [variable] name
             return -1;
     }
     return 0;
 }
 
 int
-remVariable(char* variable)
-{
-    for(int i=0; i<MAX_VARIABLES; i++)
-    {
-        if(strncmp(variables[i], variable, (uint) strlen(variable)) == 0)
-        {
-            strncpy(variables[i],EMPTY,strlen(EMPTY));
-            strncpy(values[i],EMPTY,strlen(EMPTY));
+remVariable(char *variable) {
+    for (int i = 0; i < MAX_VARIABLES; i++) {
+        if (strncmp(variables[i], variable, (uint) strlen(variable)) == 0) {
+            strncpy(variables[i], EMPTY, strlen(EMPTY));
+            strncpy(values[i], EMPTY, strlen(EMPTY));
             break;
         }
-        if( i== MAX_VARIABLES-1) //no var with [variable] name
+        if (i == MAX_VARIABLES - 1) //no var with [variable] name
             return -1;
     }
     return 0;
 }
 
-int wait2(int pid,int* wtime,int *rtime,int *iotime)
-{
+int wait2(int pid, int *wtime, int *rtime, int *iotime) {
     struct proc *p;
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    {
-        if(p->pid == pid)
-        {
-            *wtime  = p->etime-p->ctime-p->iotime-p->rtime;
-            *rtime  = p->rtime;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->pid == pid) {
+            *wtime = p->etime - p->ctime - p->iotime - p->rtime;
+            *rtime = p->rtime;
             *iotime = p->iotime;
             release(&ptable.lock);
             return 0;

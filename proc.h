@@ -52,11 +52,13 @@ struct proc
     struct file *ofile[NOFILE];  // Open files
     struct inode *cwd;           // Current directory
     char name[16];               // Process name (debugging)
+
     int ctime;
     int etime;
     int iotime;
     int rtime;
-
+    int index;
+    float Approx;
 };
 
 /*

@@ -12,3 +12,6 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 
+/*Q_3*/
+#define QUANTUM 5
+#define ALPHA 0.5f

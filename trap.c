@@ -14,6 +14,9 @@ extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
 
+/* Q_3.3 */
+uint tickLimit = 0;
+
 void
 tvinit(void) {
     int i;
@@ -45,14 +48,15 @@ trap(struct trapframe *tf) {
         return;
     }
 
-    switch (tf->trapno) {
+    switch (tf->trapno)
+    {
         case T_IRQ0 + IRQ_TIMER:
             if (cpuid() == 0) {
                 acquire(&tickslock);
                 ticks++;
+                tickLimit++;
                 wakeup(&ticks);
                 release(&tickslock);
-
                 /*
                  *  Q_2
                  */
@@ -105,11 +109,19 @@ trap(struct trapframe *tf) {
     if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
         exit();
 
+//#if defined(DEFAULT) || defined(SRT) || defined(CFSD)
     // Force process to give up CPU on clock tick.
     // If interrupts were on while locks held, would need to check nlock.
-    if (myproc() && myproc()->state == RUNNING &&
+    if (tickLimit == QUANTUM && myproc() && myproc()->state == RUNNING &&
         tf->trapno == T_IRQ0 + IRQ_TIMER)
+    {
+        tickLimit = 0;
+        if(myproc()->rtime >= myproc()->Approx)
+            myproc()->Approx = (myproc()->Approx + ALPHA * myproc()->Approx);
         yield();
+
+    }
+//#endif
 
     // Check if the process has been killed since we yielded
     if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
