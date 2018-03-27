@@ -194,31 +194,38 @@ PERSONAL_BUFFER:
             flag = 0;
         }
 
-
         //global variables
         //parse $
+        char bufProxy[100];
+        int i_proxy = 0;
         for (int i = 0; i < 100; i++) {
             if (buf[i] == '$') {
-
-                int i_var = i + 1;
-                char temp[100]; //var name
-                char value[100]; //value of var
-                int i_temp = 0; //index for var
-                //copy the var name to temp
-                while (buf[i_var] != ' ' && buf[i_var] != '\0' && buf[i_var] != '\n') {
-                    temp[i_temp] = buf[i_var];
+                i++;
+                char temp[100];
+                char value[100];
+                int i_temp = 0;
+                //copy the var name
+                while (buf[i] != ' ' && buf[i] != '\0' && buf[i] != '\n' && buf[i] != '$') {
+                    temp[i_temp] = buf[i];
                     i_temp++;
-                    i_var++;
+                    i++;
                 }
+                i--; //to prevent double i++ (int the while and in the for)
                 temp[i_temp] = '\0'; //null terminated
                 if (getVariable(temp, value) == -1) {
                     printf(2, "variable %s does not exist\n", temp);
-                    continue;
+                    continue; //TODO: continue or break ?
                 }
                 //replace the var with value.
-                //i_var + 1 = var len + $
+                int i_value = 0;
+                while(value[i_value] != '\0' && value[i_value] != '\n')
+                {
+                    bufProxy[i_proxy++] = value[i_value++];
 
-                int offset = strlen(value) - (i_var+1);
+                }
+/*
+                int varLen = strlen(temp);
+                int offset = strlen(value) - varLen;
                 i += offset;
                 int flag_switch = 0;
                 //re-use of temp
@@ -227,7 +234,7 @@ PERSONAL_BUFFER:
                     if (buf[j] == '$' && flag_switch == 0) {
                         flag_switch = 1;
                         int i_value = 0;
-                        j += i_var-1;
+                        j += varLen;
                         while (value[i_value] != '\0' && value[i_value] != '\n') {
                             temp[i_temp] = value[i_value];
                             i_temp++;
@@ -241,9 +248,12 @@ PERSONAL_BUFFER:
                 for (int j = 0; j < 100; j++) {
                     buf[j] = temp[j];
                 }
-                printf(2, "=>>> %s\n",buf);
-
+                */
             }
+            else bufProxy[i_proxy++] = buf[i];
+        }
+        for (int i = 0; i < 100; i++) {
+            buf[i] = bufProxy[i];
         }
 
         //parse =
@@ -262,11 +272,13 @@ PERSONAL_BUFFER:
                 char after[100];
 
                 while (buf[i] == ' ') i++;
-                while (buf[i] != ' ' && buf[i] != '\0' && buf[i] != '\n') {
+                //changed from:while (buf[i] != ' ' && buf[i] != '\0' && buf[i] != '\n' && buf[i] != '$') to:
+                while (buf[i] != '\0' && buf[i] != '\n') {
                     after[i_after] = buf[i];
                     i_after++;
                     i++;
                 }
+                after[i_after] = '\0'; //null terminated
                 i = original - 1;
                 while (buf[i] == ' ') {
                     i--;
@@ -282,6 +294,7 @@ PERSONAL_BUFFER:
 
                 }
                 before[i_before] = '\0';
+                printf(2, "->>> before: %s | afrer: %s\n", before, after);
                 int result = setVariable(before, after);
                 if (result == -2) printf(2, "invalid variable name\n");
                 if (result == -1) printf(2, "no room for additional variables\n");
