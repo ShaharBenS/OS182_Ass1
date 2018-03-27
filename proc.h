@@ -59,6 +59,7 @@ struct proc
     int rtime;
     int index;
     float Approx;
+    float priority;
 };
 
 /*

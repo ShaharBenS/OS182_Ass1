@@ -122,11 +122,11 @@ void            wakeup(void*);
 void            yield(void);
 
 
-int setVariable(char* variable, char* value);
-int getVariable(char* variable, char* value);
-int remVariable(char* variable);
+int             setVariable(char* variable, char* value);
+int             getVariable(char* variable, char* value);
+int             remVariable(char* variable);
 int             wait2(int pid,int * wtime, int * rtime,int * iotime);
-
+int             set_priority(int priority);
 // swtch.S
 void            swtch(struct context**, struct context*);
 

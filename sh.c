@@ -214,7 +214,7 @@ PERSONAL_BUFFER:
                 temp[i_temp] = '\0'; //null terminated
                 if (getVariable(temp, value) == -1) {
                     printf(2, "variable %s does not exist\n", temp);
-                    continue; //TODO: continue or break ?
+                    continue;
                 }
                 //replace the var with value.
                 int i_value = 0;
@@ -223,32 +223,7 @@ PERSONAL_BUFFER:
                     bufProxy[i_proxy++] = value[i_value++];
 
                 }
-/*
-                int varLen = strlen(temp);
-                int offset = strlen(value) - varLen;
-                i += offset;
-                int flag_switch = 0;
-                //re-use of temp
-                i_temp = 0;
-                for (int j = 0; j < 100; j++) {
-                    if (buf[j] == '$' && flag_switch == 0) {
-                        flag_switch = 1;
-                        int i_value = 0;
-                        j += varLen;
-                        while (value[i_value] != '\0' && value[i_value] != '\n') {
-                            temp[i_temp] = value[i_value];
-                            i_temp++;
-                            i_value++;
-                        }
-                        continue;
-                    }
-                    temp[i_temp] = buf[j];
-                    i_temp++;
-                }
-                for (int j = 0; j < 100; j++) {
-                    buf[j] = temp[j];
-                }
-                */
+
             }
             else bufProxy[i_proxy++] = buf[i];
         }

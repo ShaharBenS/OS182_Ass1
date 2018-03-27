@@ -733,3 +733,15 @@ int wait2(int pid, int *wtime, int *rtime, int *iotime) {
     release(&ptable.lock);
     return -1;
 }
+
+int set_priority(int priority)
+{
+    if (priority == 1)
+        myproc()->priority = 0.75;
+    else if(priority == 2)
+        myproc()->priority = 1;
+    else if(priority == 3)
+        myproc()->priority = 1.25;
+    else return -1;
+    return 0;
+}
