@@ -71,4 +71,5 @@ add_executable(Assignment1
         vm.c
         wc.c
         x86.h
-        zombie.c)
+        zombie.c
+        SchedSanity.c)

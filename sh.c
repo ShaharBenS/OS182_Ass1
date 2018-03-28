@@ -269,7 +269,6 @@ PERSONAL_BUFFER:
 
                 }
                 before[i_before] = '\0';
-                printf(2, "->>> before: %s | afrer: %s\n", before, after);
                 int result = setVariable(before, after);
                 if (result == -2) printf(2, "invalid variable name\n");
                 if (result == -1) printf(2, "no room for additional variables\n");

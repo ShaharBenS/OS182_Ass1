@@ -75,12 +75,13 @@ void updateProcessesTime() {
     acquire(&ptable.lock);
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if (p->state == RUNNING) {
-            p->rtime++;
+            p->rtime = p->rtime+1;
         } else if (p->state == SLEEPING) {
-            p->iotime++;
+            p->iotime = p->iotime + 1;
         } else if (p->state == RUNNABLE) {
-            p->index++;
+            p->index = p->index + 1;
         }
+
     }
     release(&ptable.lock);
 }
@@ -118,6 +119,7 @@ allocproc(void) {
     /* Q_3 */
     p->index = 0;
     p->Approx = QUANTUM;
+    p->priority = 1;
 
     release(&ptable.lock);
 
@@ -458,6 +460,51 @@ scheduler(void) {
 
 #endif
 
+//#ifdef CFSD
+        float ratio;
+        float min_ratio = 0;
+        struct proc * min_proc = 0;
+        acquire(&ptable.lock);
+        //find first RUNNABLE
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+            if(p->state == RUNNABLE)
+            {
+                min_ratio = (((float) p->rtime) * p->priority)
+                            / (float) (p->rtime + (ticks-p->ctime-p->iotime-p->rtime));
+                min_proc = p;
+                break;
+            }
+
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+            ratio = (((float) p->rtime) * p->priority)
+                    / (float) (p->rtime + (ticks-p->ctime-p->iotime-p->rtime));
+            if(p->state == RUNNABLE && ratio < min_ratio)
+            {
+                min_ratio = ratio;
+                min_proc = p;
+            }
+
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        if(min_proc != 0)
+        {
+            c->proc = min_proc;
+            switchuvm(min_proc);
+            min_proc->state = RUNNING;
+
+            swtch(&(c->scheduler), min_proc->context);
+            switchkvm();
+
+            // Process is done running for now.
+            // It should have changed its p->state before coming back.
+            c->proc = 0;
+        }
+
+
+        release(&ptable.lock);
+
+//#endif
 
 
     }
@@ -543,8 +590,8 @@ sleep(void *chan, struct spinlock *lk) {
     // Go to sleep.
     p->chan = chan;
     p->state = SLEEPING;
-    if(p->rtime >= p->Approx)
-        p->Approx = (p->Approx + ALPHA *p->Approx);
+    if (p->rtime >= p->Approx)
+        p->Approx = (p->Approx + ALPHA * p->Approx);
 
 
     sched();
@@ -718,29 +765,60 @@ remVariable(char *variable) {
     return 0;
 }
 
+
 int wait2(int pid, int *wtime, int *rtime, int *iotime) {
     struct proc *p;
+    int havekids;
+    struct proc *curproc = myproc();
+
     acquire(&ptable.lock);
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-        if (p->pid == pid) {
-            *wtime = p->etime - p->ctime - p->iotime - p->rtime;
-            *rtime = p->rtime;
-            *iotime = p->iotime;
-            release(&ptable.lock);
-            return 0;
+    for(;;) {
+        // Scan through table looking for exited children.
+        havekids = 0;
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if (p->parent != curproc)
+                continue;
+            if (p->pid == pid)
+            {
+                havekids = 1;
+                if (p->state == ZOMBIE && p->pid == pid) {
+                    // Found one.
+                    kfree(p->kstack);
+                    p->kstack = 0;
+                    freevm(p->pgdir);
+                    p->pid = 0;
+                    p->parent = 0;
+                    p->name[0] = 0;
+                    p->killed = 0;
+                    p->state = UNUSED;
+
+
+                    *wtime = p->etime - p->ctime - p->iotime - p->rtime;
+                    *rtime = p->rtime;
+                    *iotime = p->iotime;
+                    release(&ptable.lock);
+                    return 0;
+                }
+            }
         }
+
+        // No point waiting if we don't have any children.
+        if (!havekids || curproc->killed) {
+            release(&ptable.lock);
+            return -1;
+        }
+
+        // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+        sleep(curproc, &ptable.lock);  //DOC: wait-sleep
     }
-    release(&ptable.lock);
-    return -1;
 }
 
-int set_priority(int priority)
-{
+int set_priority(int priority) {
     if (priority == 1)
         myproc()->priority = 0.75;
-    else if(priority == 2)
+    else if (priority == 2)
         myproc()->priority = 1;
-    else if(priority == 3)
+    else if (priority == 3)
         myproc()->priority = 1.25;
     else return -1;
     return 0;

@@ -109,7 +109,7 @@ trap(struct trapframe *tf) {
     if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
         exit();
 
-//#if defined(DEFAULT) || defined(SRT) || defined(CFSD)
+#if defined(DEFAULT) || defined(SRT) || defined(CFSD)
     // Force process to give up CPU on clock tick.
     // If interrupts were on while locks held, would need to check nlock.
     if (tickLimit == QUANTUM && myproc() && myproc()->state == RUNNING &&
@@ -121,7 +121,7 @@ trap(struct trapframe *tf) {
         yield();
 
     }
-//#endif
+#endif
 
     // Check if the process has been killed since we yielded
     if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)

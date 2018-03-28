@@ -119,9 +119,9 @@ int sys_wait2(void) {
     int rtime;
     int iotime;
     if (argint(0, &pid) < 0 || argint(1, &wtime) < 0 || argint(2, &rtime) < 0 || argint(3, &iotime)) {
-        return wait2(*((int *) pid), (int *) wtime, (int *) rtime, (int *) iotime);
+        return -1;
     }
-    return -1;
+    return wait2(pid, (int *) wtime, (int *) rtime, (int *) iotime);
 }
 
 int sys_set_priority(void) {
